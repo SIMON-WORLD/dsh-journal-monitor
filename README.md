@@ -6,7 +6,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![dsh-plugin](https://img.shields.io/badge/ecosystem-dsh--plugin-orange)](https://github.com/topics/dsh-plugin)
 
-> **⚠️ 状态（诚实声明）**：v0.5.0 = 可用原型。已实现并实测：多源抓取（NBER 42 条 ✓ + arXiv 三类目各 10 条 ✓ + **《世界经济》online_first 7 条 + 当期目录 8 条含摘要/作者/卷期 ✓**）、关键词过滤（✓ 单测）、工具注册（5 工具 ✓）、dry-run 推送（✓）、去重持久化（✓）、定时简报参数生成（✓，schedule_create 兼容）、**插件树加载探针（✓ 真实 dsh-tools API 端到端）**。**未实现**：真实 Bark/飞书推送（代码有，需配置 webhook 后验证）、Web/UI 端到端验收、定时调度的端到端执行验证（建议配合 dsh-schedule 实测）。
+> **⚠️ 状态（诚实声明）**：v0.6.0 = 可用原型。已实现并实测：多源抓取（NBER 42 条 ✓ + arXiv 三类目各 10 条 ✓ + **《世界经济》online_first 7 条 + 当期目录 8 条 ✓ + 《中国农村观察》34 条 ✓**）、关键词过滤（✓ 单测）、工具注册（5 工具 ✓）、dry-run 推送（✓）、去重持久化（✓）、定时简报参数生成（✓，schedule_create 兼容）、**插件树加载探针（✓ 真实 dsh-tools API 端到端）**。**未实现**：真实 Bark/飞书推送（代码有，需配置 webhook 后验证）、Web/UI 端到端验收、定时调度的端到端执行验证（建议配合 dsh-schedule 实测）。
 
 ## 为什么是真插件，不是 skill
 
@@ -95,8 +95,8 @@ npm test             # 单测（parseFeed/filterItems/itemId，6 用例）
 **门禁清单（达到才可发版）**：
 
 - [x] typecheck 通过（erasableSyntaxOnly）
-- [x] 单测 15/15 通过
-- [x] 真实抓取验证：NBER RSS HTTP 200 解析 42 条、arXiv econ.GN/EM/q-fin.GN 各 10 条、**《世界经济》online_first 7 条 + 当期目录 8 条（含作者/卷期/摘要）**
+- [x] 单测 19/19 通过
+- [x] 真实抓取验证：NBER RSS 42 条、arXiv econ.GN/EM/q-fin.GN 各 10 条、**《世界经济》online_first 7 + 当期目录 8、《中国农村观察》34 条**
 - [x] 插件契约：name/inject/apply + cordis.patch.yml + dsh.bundle 完整
 - [x] 工具注册：5 工具注册成功（真实 dsh-tools API）
 - [x] **插件树加载探针：scripts/probe-embed.mjs（真实 dsh-tools 端到端，已入 CI）**
@@ -112,8 +112,9 @@ npm test             # 单测（parseFeed/filterItems/itemId，6 用例）
 - [x] v0.3.0：**中文经管期刊源（《世界经济》online_first）**——经济学垂直差异化
 - [x] v0.4.0：**插件树加载探针（真实 dsh-tools API，入 CI）**
 - [x] v0.5.0：**《世界经济》当期目录源（含作者/卷期/摘要全文解析）**
-- [ ] v0.6.0：真实推送验证（Bark/飞书 webhook）+ 定时调度端到端
-- [ ] v0.7.0：更多中文经管期刊（管理世界/经济研究/中国工业经济）+ 引用核验联动
+- [x] v0.6.0：**《中国农村观察》（ajcass 平台，34 条当期目录）**
+- [ ] v0.7.0：真实推送验证（Bark/飞书 webhook）+ 定时调度端到端
+- [ ] v0.8.0：更多中文经管期刊（管理世界/经济研究/中国工业经济）+ 引用核验联动
 
 ## 文档
 
