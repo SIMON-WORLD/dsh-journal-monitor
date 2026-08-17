@@ -275,14 +275,15 @@ export function buildBriefing(topic: string, intervalDays: number): { every_seco
   return { every_seconds: everySeconds, schedule_prompt: prompt }
 }
 
-/** 推送：默认 dry-run 只打印；配置 barkUrl / feishuUrl 任一才真实发送。 */
-async function push(
+/** 推送：默认 dry-run 只打印；配置 barkUrl / feishuUrl 任一才真实发送。导出供集成测试。 */
+export async function push(
   items: Array<Record<string, string>>,
   opts: { barkUrl?: string; feishuUrl?: string; dryRun?: boolean },
 ): Promise<{ pushed: Array<Record<string, string>>; skipped: number; dryRun: boolean }> {
   const state = readState()
   const newItems = items.filter((it) => !state.has(itemId(it)))
-  const dryRun = opts.dryRun !== false && !opts.barkUrl && !opts.feishuUrl
+  // 显式 dryRun: true 覆盖 webhook；无 webhook 时自动 dry-run；dryRun: false 且无 webhook 也按 dry-run（不误发）
+  const dryRun = opts.dryRun === true || (!opts.barkUrl && !opts.feishuUrl)
   const sent: Array<Record<string, string>> = []
   for (const it of newItems) {
     const id = itemId(it)
