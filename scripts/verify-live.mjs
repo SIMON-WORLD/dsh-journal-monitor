@@ -9,13 +9,24 @@
  *   3. parseFeed / filterItems / itemId 在真实数据上工作
  * 退出码：0 = 全过；1 = 任一失败
  */
-import { parseFeed, filterItems, itemId, fetchArxivCategory } from '../lib/index.js'
+import { parseFeed, filterItems, itemId, fetchArxivCategory, parseCnToc } from '../lib/index.js'
 
 const CHECKS = [
   { label: 'NBER Working Papers', run: () => fetch('https://www.nber.org/rss/new.xml', { headers: { 'user-agent': 'dsh-journal-monitor/0.2' } }).then((r) => ({ ok: r.ok, status: r.status, text: () => r.text() })) },
   { label: 'arXiv econ.GN (API)', run: () => fetchArxivCategory('econ.GN', 10) },
   { label: 'arXiv econ.EM (API)', run: () => fetchArxivCategory('econ.EM', 10) },
   { label: 'arXiv q-fin.GN (API)', run: () => fetchArxivCategory('q-fin.GN', 10) },
+  {
+    label: '世界经济 online_first (CN TOC)',
+    run: () =>
+      fetch('https://sjjj.magtech.com.cn/CN/online_first', {
+        signal: AbortSignal.timeout(25000),
+        headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36' },
+      }).then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return parseCnToc(await r.text(), 'https://sjjj.magtech.com.cn/CN/online_first')
+      }),
+  },
 ]
 
 let failures = 0

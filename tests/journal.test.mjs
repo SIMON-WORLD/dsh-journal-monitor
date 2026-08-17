@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseFeed, filterItems, itemId, buildBriefing, ECON_SOURCES, fetchArxivCategory } from '../src/index.ts'
+import { parseFeed, filterItems, itemId, buildBriefing, ECON_SOURCES, fetchArxivCategory, parseCnToc } from '../src/index.ts'
 
 const SAMPLE_RSS = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel>
@@ -122,4 +122,33 @@ test('fetchArxivCategory: 真实抓取 arXiv econ.GN（联网，失败时跳过�
     // 网络受限环境跳过；CI 有独立 live probe
     console.warn('（网络受限，跳过真实 arXiv 抓取断言）')
   }
+})
+
+test('parseCnToc: 解析中文期刊 HTML 目录页（abstract*.shtml 链接）', () => {
+  const html = `<html><body>
+    <a href="https://sjjj.magtech.com.cn/CN/abstract/abstract1193.shtml">打开比较优势技术来源的"黑箱"：中间投入品结构的视角</a>
+    <a href="https://sjjj.magtech.com.cn/CN/abstract/abstract1192.shtml">专精特新政策与创新质量——基于上市公司发明专利文本的经验证据</a>
+    <a href="https://sjjj.magtech.com.cn/CN/online_first">在线预览</a>
+    <a href="/CN/abstract/abstract1189.shtml">城市中心跨越世纪的记忆与嬗变</a>
+  </body></html>`
+  const items = parseCnToc(html, 'https://sjjj.magtech.com.cn/CN/online_first')
+  // 只保留真实文章（去重 + 过滤过短的导航链接）
+  assert.ok(items.length >= 3, `expected >=3, got ${items.length}`)
+  assert.match(items[0].title, /比较优势/)
+  assert.match(items[0].link, /abstract1193/)
+  // 相对路径解析为绝对 URL
+  const abs = items.find((i) => i.link.includes('abstract1189'))
+  assert.ok(abs && abs.link.startsWith('https://sjjj.magtech.com.cn/CN/abstract/abstract1189.shtml'))
+})
+
+test('parseCnToc: 空输入/无文章返回空数组', () => {
+  assert.equal(parseCnToc('', 'https://x/').length, 0)
+  assert.equal(parseCnToc('<html><a href="/a">首页</a></html>', 'https://x/').length, 0)
+})
+
+test('ECON_SOURCES: 含中文经管期刊源 sjjj', () => {
+  const sjjj = ECON_SOURCES.find((s) => s.id === 'sjjj')
+  assert.ok(sjjj, 'should contain sjjj source')
+  assert.equal(sjjj.kind, 'cn-toc')
+  assert.match(sjjj.label, /世界经济/)
 })

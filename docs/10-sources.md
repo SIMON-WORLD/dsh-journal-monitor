@@ -3,7 +3,7 @@
 > 每个源都必须通过 `node scripts/verify-live.mjs` 真实可达验证后才能标记「可用」。
 > 状态：🟢 已验证 / 🟡 规划中 / ⚪ 待验证
 
-## 内置源（v0.2.0）
+## 内置源（v0.3.0）
 
 | 源 | URL/API | 类型 | 状态 |
 |---|---|---|---|
@@ -12,6 +12,20 @@
 | arXiv 计量经济学（econ.EM） | export.arxiv.org/api/query?cat:econ.EM | 预印本 API | 🟢 已实测（10 条） |
 | arXiv 理论经济学（econ.TH） | export.arxiv.org/api/query?cat:econ.TH | 预印本 API | 🟢 已实测 |
 | arXiv 量化金融（q-fin.GN） | export.arxiv.org/api/query?cat:q-fin.GN | 预印本 API | 🟢 已实测（10 条） |
+| **世界经济（中文经管）** | https://sjjj.magtech.com.cn/CN/online_first | 中文期刊 HTML 目录 | 🟢 已实测（7 条，abstract*.shtml 解析） |
+
+## 中文经管期刊源扩展（探测记录 2026-08-17）
+
+| 期刊 | 平台 | 可达性 | 说明 |
+|---|---|---|---|
+| 世界经济 | 玛格泰克（sjjj.magtech.com.cn） | 🟢 已接入 | online_first 页可解析 abstract*.shtml 文章 |
+| 中国工业经济 | ciejournal.org | ⚪ JS 重定向墙 | /feed 是反爬 JS 页，无公开 RSS |
+| 经济研究 | erj.cn | ⚪ 沙箱内连不上 | 官网拒绝连接（本地网络限制） |
+| 管理世界 | mwm.net.cn | ⚪ 超时 | 官网不可达 |
+| 中国农村经济 | ajcass.com | ⚪ JS 渲染页 | 骨架页 660 字节，无 SSR 内容 |
+| 数量经济技术经济研究 | jqte.net | ⚪ 仅新闻 | 无文章目录/RSS |
+
+> 玛格泰克平台（magtech.com.cn）是中文期刊主流托管平台，`parseCnToc` 解析器可复用于该平台其他期刊（如各社科期刊）。
 
 ## 扩展源（经济学垂直，v0.3.0 规划）
 

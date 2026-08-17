@@ -17,13 +17,19 @@ import { dirname, join } from 'node:path'
 export const name = 'dsh-journal-monitor'
 export const inject = ['tools']
 
-/** 经济学文献源：arXiv 多类目（API）+ NBER RSS */
+/** 经济学文献源：arXiv 多类目（API）+ NBER RSS + 中文经管期刊（HTML 目录页） */
 export const ECON_SOURCES = [
   { id: 'arxiv-econ.GN', kind: 'arxiv', label: 'arXiv 一般经济学' },
   { id: 'arxiv-econ.EM', kind: 'arxiv', label: 'arXiv 计量经济学' },
   { id: 'arxiv-econ.TH', kind: 'arxiv', label: 'arXiv 理论经济学' },
   { id: 'arxiv-q-fin.GN', kind: 'arxiv', label: 'arXiv 量化金融' },
   { id: 'nber', kind: 'rss', label: 'NBER Working Papers', url: 'https://www.nber.org/rss/new.xml' },
+  {
+    id: 'sjjj',
+    kind: 'cn-toc',
+    label: '世界经济（中文经管）',
+    url: 'https://sjjj.magtech.com.cn/CN/online_first',
+  },
 ]
 
 /** 内置默认 RSS 源（v0.1.0 兼容：journal_scan 无参调用） */
@@ -121,11 +127,41 @@ export async function fetchArxivCategory(category: string, limit = 10, timeoutMs
   return parseFeed(await res.text())
 }
 
-/** 按源 id 抓取：arXiv 类目（arxiv-*）走 API，其余按 RSS URL。 */
+/** 解析中文期刊 HTML 目录页（玛格泰克平台 online_first 等）：提取 abstract*.shtml 链接与标题。 */
+export function parseCnToc(html: string, baseUrl: string): Array<Record<string, string>> {
+  const items: Array<Record<string, string>> = []
+  const seen = new Set<string>()
+  const re = /<a[^>]*href="([^"]*(?:abstract|article|view|online)[^"]*)"[^>]*>([\s\S]{2,180}?)<\/a>/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(html)) !== null) {
+    const href = m[1]
+    const rawTitle = m[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+    if (rawTitle.length < 4 || seen.has(rawTitle)) continue
+    seen.add(rawTitle)
+    const link = href.startsWith('http') ? href : new URL(href, baseUrl).href
+    items.push({ title: rawTitle, link, summary: '', date: '' })
+  }
+  return items
+}
+
+/** 抓取中文期刊 HTML 目录页。 */
+async function fetchCnToc(url: string, timeoutMs = 25000): Promise<Array<Record<string, string>>> {
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(timeoutMs),
+    headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36' },
+  })
+  if (!res.ok) throw new Error(`CN TOC HTTP ${res.status}`)
+  return parseCnToc(await res.text(), url)
+}
+
+/** 按源 id 抓取：arXiv 类目（arxiv-*）走 API，cn-toc 走中文 HTML 目录页，其余按 RSS URL。 */
 async function fetchSource(src: { id: string; kind?: string; url?: string }, limit: number): Promise<Array<Record<string, string>>> {
   if (src.kind === 'arxiv' || /^arxiv-/.test(src.id)) {
     const cat = src.id.replace(/^arxiv-/, '')
     return fetchArxivCategory(cat, limit)
+  }
+  if (src.kind === 'cn-toc' && src.url) {
+    return (await fetchCnToc(src.url)).slice(0, limit)
   }
   if (src.url) return fetchFeed(src.url)
   return []
