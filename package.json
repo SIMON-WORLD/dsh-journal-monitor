@@ -1,7 +1,7 @@
 {
   "name": "dsh-journal-monitor",
-  "description": "经管期刊/工作论文监控推送插件（经济学垂直）：arXiv 多类目 API + NBER RSS + 中文经管期刊（世界经济/中国农村观察 双平台）抓取 → 关键词过滤 → dry-run/Webhook 推送（含本地 mock 集成测试）→ 去重持久化 → 定时简报。含真实 dsh-tools 插件树加载探针。",
-  "version": "0.7.0",
+  "description": "经管期刊/工作论文监控推送插件（经济学垂直）：arXiv 多类目 API + NBER RSS + 中文经管期刊（世界经济/中国农村观察 双平台）抓取 → 关键词过滤 → dry-run/Webhook 推送（含本地 mock 集成测试）→ 去重持久化 → 定时简报（schedule_create 协议端到端验证）。含真实 dsh-tools 插件树加载探针。",
+  "version": "0.8.0",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -16,7 +16,8 @@
     "build": "tsc -p tsconfig.json",
     "check": "npm run typecheck",
     "test": "node --test tests/*.test.mjs",    "probe": "node scripts/probe-embed.mjs",
-    "verify": "npm run check && npm run build && npm test && npm run probe"
+    "probe:schedule": "node scripts/probe-schedule.mjs",
+    "verify": "npm run check && npm run build && npm test && npm run probe && npm run probe:schedule"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",

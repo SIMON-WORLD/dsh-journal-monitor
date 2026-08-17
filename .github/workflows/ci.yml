@@ -27,5 +27,9 @@ jobs:
         run: npm test
       - name: Plugin tree load probe (real dsh-tools API)
         run: node scripts/probe-embed.mjs
+      - name: Schedule protocol probe (real dsh-schedule API)
+        run: |
+          npm install --no-save @deepseek-ai/dsh-schedule@0.1.0-rc.6 --no-audit --no-fund
+          node scripts/probe-schedule.mjs
       - name: Live feed probe (NBER + arXiv econ + CN journal)
         run: node scripts/verify-live.mjs
