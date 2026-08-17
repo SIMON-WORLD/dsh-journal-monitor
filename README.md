@@ -122,6 +122,7 @@ npm test             # 单测（parseFeed/filterItems/itemId，6 用例）
 
 - [10-sources.md](docs/10-sources.md) — 期刊/数据源清单与扩展方法
 - [20-cn-journals.md](docs/20-cn-journals.md) — 中文经管期刊接入规划（进行中）
+- [30-push-verification.md](docs/30-push-verification.md) — 推送链路端到端验证记录（mock 服务器，含 dry-run bug 修复说明）
 
 ## 贡献
 
