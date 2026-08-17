@@ -52,6 +52,30 @@ const CHECKS = [
         return parseAjcass(await r.text(), 'https://zgncgc.ajcass.com/')
       }),
   },
+  {
+    label: '财贸经济当期目录 (ajcass v2)',
+    soft: true,
+    run: () =>
+      fetch('https://cmjj.ajcass.com/', {
+        signal: AbortSignal.timeout(25000),
+        headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36' },
+      }).then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return parseAjcass(await r.text(), 'https://cmjj.ajcass.com/')
+      }),
+  },
+  {
+    label: '中国人口科学当期目录 (ajcass v2)',
+    soft: true,
+    run: () =>
+      fetch('https://zgrkkx.ajcass.com/', {
+        signal: AbortSignal.timeout(25000),
+        headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36' },
+      }).then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return parseAjcass(await r.text(), 'https://zgrkkx.ajcass.com/')
+      }),
+  },
 ]
 
 let failures = 0

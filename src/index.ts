@@ -42,6 +42,18 @@ export const ECON_SOURCES = [
     label: '中国农村观察（中文经管）',
     url: 'https://zgncgc.ajcass.com/',
   },
+  {
+    id: 'cmjj',
+    kind: 'ajcass',
+    label: '财贸经济（中文经管）',
+    url: 'https://cmjj.ajcass.com/',
+  },
+  {
+    id: 'zgrkkx',
+    kind: 'ajcass',
+    label: '中国人口科学（中文经管）',
+    url: 'https://zgrkkx.ajcass.com/',
+  },
 ]
 
 /** 内置默认 RSS 源（v0.1.0 兼容：journal_scan 无参调用） */
@@ -182,25 +194,74 @@ export function parseCnToc(html: string, baseUrl: string): Array<Record<string, 
 export function parseAjcass(html: string, baseUrl: string): Array<Record<string, string>> {
   const items: Array<Record<string, string>> = []
   const seen = new Set<string>()
-  // 按绿色标题块（class="green"）切分，避免 [摘要]/[PDF] 链接干扰
+
+  // 版式 A：旧版（中国农村观察）——<p class="green"> 标题块 + <p class="hod pop"> 卷期块
   const blockRe = /<p[^>]*class="green"[^>]*>([\s\S]*?)<\/p>/gi
   let bm: RegExpExecArray | null
   while ((bm = blockRe.exec(html)) !== null) {
     const block = bm[1]
     const href = block.match(/href="(\/Magazine\/Show\?id=\d+)"/)?.[1]
     const title = block.match(/<a[^>]*>([\s\S]{2,200}?)<\/a>/)?.[1]?.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
-    const authors = block.match(/作者:([\s\S]{2,80}?)<\/span>|<span>作者:([\s\S]{2,80}?)</)?.[1] || block.match(/作者:([\s\S]{2,80}?)(?:<|$)/)?.[1]
-    if (!title || title.length < 4 || seen.has(title)) continue
+    const authors = block.match(/作者:([\s\S]{2,80}?)(?:<|$)/)?.[1]
+    if (!href || !title || title.length < 4 || seen.has(title)) continue
     seen.add(title)
-    // 卷期：从绿色块之后的 300 字符内找（20xx NO.n）
     const tail = html.slice(bm.index + bm[0].length, bm.index + bm[0].length + 400)
     const vol = tail.match(/(20\d{2}\s*NO\.\d+)/)?.[1] ?? ''
     items.push({
       title,
-      link: href && href.startsWith('http') ? href : href ? new URL(href, baseUrl).href : '',
+      link: href.startsWith('http') ? href : new URL(href, baseUrl).href,
       summary: '',
       date: vol.trim(),
       authors: (authors ?? '').replace(/\s+/g, ' ').trim(),
+    })
+  }
+
+  // 版式 B：新版（财贸经济/中国人口科学）——<li><h3><a>标题</a></h3><p>作者</p><p><span>卷期</span><a class="zy" title="摘要">
+  // 跨 li 可能同一 href 出现截断标题（…）与完整标题，按 href 全局保留最长标题
+  const byHref = new Map<string, { title: string; block: string }>()
+  const liRe = /<li\b[^>]*>([\s\S]*?)<\/li>/gi
+  let lm: RegExpExecArray | null
+  while ((lm = liRe.exec(html)) !== null) {
+    const block = lm[1]
+    const href = block.match(/href="(\/Magazine\/Show\?(?:ID|id)=\d+)"/)?.[1]
+    if (!href) continue
+    // 取 li 内最长的 a 文本作为标题（截断版 … 会被完整版覆盖）
+    let bestTitle = ''
+    const aRe = /<a[^>]*>([\s\S]{2,220}?)<\/a>/g
+    let am: RegExpExecArray | null
+    while ((am = aRe.exec(block)) !== null) {
+      const t = am[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+      if (t.length > bestTitle.length) bestTitle = t
+    }
+    if (!bestTitle || bestTitle.length < 4 || /^\[?(摘要|PDF|下载)/.test(bestTitle)) continue
+    const absHref = href.startsWith('http') ? href : new URL(href, baseUrl).href
+    const existing = byHref.get(absHref)
+    // 同 href 截断标题（含 … 省略号）应被完整标题覆盖；都不含省略号时取更长
+    const isTruncated = (t: string) => /…|\.\.\./.test(t)
+    if (existing) {
+      const oldWins = !isTruncated(existing.title) && isTruncated(bestTitle) // 旧的是完整版
+      const newWins = isTruncated(existing.title) && !isTruncated(bestTitle) // 新的是完整版
+      const sameClass = isTruncated(existing.title) === isTruncated(bestTitle) && bestTitle.length <= existing.title.length
+      if (newWins) byHref.set(absHref, { title: bestTitle, block })
+      if (oldWins || sameClass) continue
+    } else {
+      byHref.set(absHref, { title: bestTitle, block })
+    }
+  }
+  for (const [absHref, { title, block }] of byHref) {
+    if (seen.has(title)) continue
+    seen.add(title)
+    let authors = ''
+    const pm = block.match(/<p[^>]*>\s*([^<]{2,60}?)\s*<\/p>/)
+    if (pm && !/20\d{2}年/.test(pm[1])) authors = pm[1]
+    const vol = block.match(/(20\d{2}年\s*第\(?\d+\)?卷[^<]*?第\d+期[^<]*?)/)?.[1]?.replace(/\s+/g, ' ').trim() ?? ''
+    const summary = block.match(/class="zy"[^>]*title="([\s\S]*?)"/)?.[1]?.replace(/\s+/g, ' ').trim() ?? ''
+    items.push({
+      title,
+      link: absHref,
+      summary,
+      date: vol,
+      authors: authors.replace(/\s+/g, ' ').trim(),
     })
   }
   return items

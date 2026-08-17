@@ -202,6 +202,39 @@ test('parseAjcass: 排除 [摘要]/[PDF] 操作链接（去重后唯一）', () 
   assert.equal(items[0].title, '农村集体经营性建设用地入市的困境与出路')
 })
 
+test('parseAjcass: 新版 h3 版式（财贸经济/人口科学）——标题/作者/卷期/摘要', () => {
+  const html = `<html><body><ul class="list block">
+    <li>
+      <h3><a href="/Magazine/Show?ID=123349">[5] 更好发挥经济体制改革的牵引作用</a></h3>
+      <p>胡家勇</p>
+      <p><span>2026年 第(47)卷,第8期 第5-20页</span><a class="zy" title="经济体制改革一直扮演先行者角色">[摘要]</a></p>
+    </li>
+    <li>
+      <h3><a href="/Magazine/Show?ID=123350">[6] 算法凝视下的企业策略性信息披露</a></h3>
+      <p>谭洪涛</p>
+      <p><span>2026年 第(47)卷,第8期 第21-40页</span><a class="zy" title="研究监管科技的影响">[摘要]</a></p>
+    </li>
+  </ul></body></html>`
+  const items = parseAjcass(html, 'https://cmjj.ajcass.com/')
+  assert.equal(items.length, 2)
+  assert.equal(items[0].title, '[5] 更好发挥经济体制改革的牵引作用')
+  assert.equal(items[0].authors, '胡家勇')
+  assert.match(items[0].date, /第\(47\)卷/)
+  assert.match(items[0].summary, /先行者角色/)
+  assert.match(items[0].link, /ID=123349/)
+})
+
+test('parseAjcass: 同 href 截断标题去重（保留更长标题）', () => {
+  // 真实站点两个 li 指向同一 href，标题分别是截断版与完整版
+  const html = `<html><body><ul class="list block">
+    <li><h3><a href="/Magazine/Show?id=123300">中国儿童居住安排变迁及其...</a></h3></li>
+    <li><h3><a href="/Magazine/Show?id=123300">中国儿童居住安排变迁及其对</a></h3></li>
+  </ul></body></html>`
+  const items = parseAjcass(html, 'https://zgrkkx.ajcass.com/')
+  assert.equal(items.length, 1)
+  assert.equal(items[0].title, '中国儿童居住安排变迁及其对')
+})
+
 test('parseAjcass: 空输入返回空数组', () => {
   assert.equal(parseAjcass('', 'https://x/').length, 0)
   assert.equal(parseAjcass('<html><a href="/a">首页</a></html>', 'https://x/').length, 0)
