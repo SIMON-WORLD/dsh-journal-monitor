@@ -33,7 +33,7 @@ report(typeof m.apply === 'function', 'apply is function')
 // 2. 真实 dsh-tools 注册
 const registered = []
 m.apply({ tools: { register: (def) => registered.push(def) } })
-report(registered.length === 5, `registered 5 tools: ${registered.map((d) => d.name).join(', ')}`)
+report(registered.length === 7, `registered 7 tools: ${registered.map((d) => d.name).join(', ')}`)
 for (const def of registered) {
   report(def.parameters?.type === 'object', `${def.name}: schema compiled`)
   report(typeof def.execute === 'function', `${def.name}: execute present`)

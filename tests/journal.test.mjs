@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseFeed, filterItems, itemId, buildBriefing, ECON_SOURCES, fetchArxivCategory, parseCnToc, parseAjcass } from '../src/index.ts'
+import { parseFeed, filterItems, itemId, buildBriefing, ECON_SOURCES, fetchArxivCategory, parseCnToc, parseAjcass, registerSource, allSources, customSources } from '../src/index.ts'
 
 const SAMPLE_RSS = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel>
@@ -245,4 +245,34 @@ test('ECON_SOURCES: 含 ajcass 平台源 zgncgc', () => {
   assert.ok(z, 'should contain zgncgc source')
   assert.equal(z.kind, 'ajcass')
   assert.match(z.label, /中国农村观察/)
+})
+
+test('registerSource: 注册自定义源 + 去重 + 校验', () => {
+  // 清理自定义源（测试隔离）
+  customSources.length = 0
+  // 成功注册
+  const ok = registerSource({ id: 'my-blog', url: 'https://example.com/feed.xml', kind: 'rss', label: 'My Blog' })
+  assert.equal(ok.ok, true)
+  assert.ok(allSources().some((s) => s.id === 'my-blog'))
+  // 重复 id 拒绝
+  const dup = registerSource({ id: 'my-blog', url: 'https://x/2.xml' })
+  assert.equal(dup.ok, false)
+  assert.match(dup.error, /duplicate/)
+  // 非法 id 拒绝
+  const bad = registerSource({ id: 'has space', url: 'https://x/3.xml' })
+  assert.equal(bad.ok, false)
+  assert.match(bad.error, /invalid id/)
+  // 非 arxiv 缺 url 拒绝
+  const nourl = registerSource({ id: 'no-url' })
+  assert.equal(nourl.ok, false)
+  assert.match(nourl.error, /url required/)
+  // 清理
+  customSources.length = 0
+})
+
+test('registerSource: 测试隔离（清空后不影响内置源）', () => {
+  customSources.length = 0
+  const ids = allSources().map((s) => s.id)
+  assert.ok(ids.includes('nber'))
+  assert.ok(ids.includes('zgncgc'))
 })

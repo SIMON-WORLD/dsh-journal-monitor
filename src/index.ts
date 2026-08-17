@@ -17,6 +17,24 @@ import { dirname, join } from 'node:path'
 export const name = 'dsh-journal-monitor'
 export const inject = ['tools']
 
+/** 运行时自定义源（journal_add_source 注册，会话内有效） */
+export const customSources: Array<{ id: string; kind?: string; url?: string; label?: string }> = []
+
+/** 注册自定义源：id 唯一；kind 支持 rss / arxiv / cn-toc / ajcass。 */
+export function registerSource(src: { id: string; kind?: string; url?: string; label?: string }): { ok: boolean; error?: string } {
+  if (!src.id || !/^[a-zA-Z0-9-_]{2,40}$/.test(src.id)) return { ok: false, error: `invalid id: ${src.id}` }
+  if (!src.url && src.kind !== 'arxiv') return { ok: false, error: 'url required for non-arxiv sources' }
+  const existing = [...ECON_SOURCES, ...customSources].find((s) => s.id === src.id)
+  if (existing) return { ok: false, error: `duplicate id: ${src.id}` }
+  customSources.push({ id: src.id, kind: src.kind ?? 'rss', url: src.url, label: src.label ?? src.id })
+  return { ok: true }
+}
+
+/** 全部源（内置 + 自定义）。 */
+export function allSources(): Array<{ id: string; kind?: string; url?: string; label?: string }> {
+  return [...ECON_SOURCES, ...customSources]
+}
+
 /** 经济学文献源：arXiv 多类目（API）+ NBER RSS + 中文经管期刊（HTML 目录页） */
 export const ECON_SOURCES = [
   { id: 'arxiv-econ.GN', kind: 'arxiv', label: 'arXiv 一般经济学' },
@@ -409,27 +427,28 @@ export function apply(ctx: any): void {
       },
       execute: async (args: any) => {
         const limit = args.limit && Number(args.limit) > 0 ? Number(args.limit) : 20
+        const sources = allSources()
         try {
           if (args.sourceUrl) {
             const items = await fetchFeed(args.sourceUrl)
             return { source: args.sourceUrl, count: items.length, items: items.slice(0, limit) }
           }
           if (args.source) {
-            const src = ECON_SOURCES.find((s) => s.id === args.source)
-            if (!src) return { error: `unknown source: ${args.source}（可用 ${ECON_SOURCES.map((s) => s.id).join('、')}）` }
+            const src = sources.find((s) => s.id === args.source)
+            if (!src) return { error: `unknown source: ${args.source}（可用 ${sources.map((s) => s.id).join('、')}）` }
             const items = await fetchSource(src, limit)
             return { source: args.source, count: items.length, items: items.slice(0, limit) }
           }
-          // 默认抓全部 ECON_SOURCES
+          // 默认抓全部源（内置 + 自定义）
           const all: Array<Record<string, string>> = []
-          for (const src of ECON_SOURCES) {
+          for (const src of sources) {
             try {
-              all.push(...(await fetchSource(src, Math.ceil(limit / ECON_SOURCES.length))))
+              all.push(...(await fetchSource(src, Math.ceil(limit / sources.length))))
             } catch {
               // 单个源失败不阻断整体
             }
           }
-          return { source: ECON_SOURCES.map((s) => s.id).join(', '), count: all.length, items: all.slice(0, limit) }
+          return { source: sources.map((s) => s.id).join(', '), count: all.length, items: all.slice(0, limit) }
         } catch (e) {
           return { error: `fetch failed: ${e instanceof Error ? e.message : String(e)}` }
         }
@@ -597,7 +616,67 @@ export function apply(ctx: any): void {
       },
       execute: async (args: any) => {
         const { every_seconds, schedule_prompt } = buildBriefing(args.topic, args.interval_days ?? 1)
-        return { every_seconds, schedule_prompt, sources: ECON_SOURCES.map((s) => s.id) }
+        return { every_seconds, schedule_prompt, sources: allSources().map((s) => s.id) }
+      },
+    }),
+  )
+
+  ctx.tools.register(
+    defineTool({
+      name: 'journal_add_source',
+      description:
+        '注册自定义监控源（会话内有效，重启失效）。kind 支持 rss（RSS/Atom URL）/ arxiv（arXiv 类目 id）/ cn-toc（玛格泰克平台）/ ajcass（社科院平台）。示例：journal_add_source(id="my-econ-blog", url="https://example.com/feed.xml", kind="rss")',
+      parameters: {
+        id: { type: 'string', required: true, description: '源唯一 id（字母数字-_，2-40 字符）' },
+        url: { type: 'string', description: '源 URL（arxiv 类目可省略）' },
+        kind: { type: 'string', description: 'rss（默认）/ arxiv / cn-toc / ajcass' },
+        label: { type: 'string', description: '显示名（默认用 id）' },
+      },
+      output: {
+        schema: {
+          type: 'object',
+          properties: {
+            ok: { type: 'boolean' },
+            error: { type: 'string' },
+            sources: { type: 'array', items: { type: 'string' } },
+          },
+          additionalProperties: false,
+        },
+        render: (_args: unknown, value: any) => {
+          if (!value.ok) return [{ type: 'text', text: `[journal_add_source] 失败：${value.error}` }]
+          return [{ type: 'text', text: `[journal_add_source] 已注册。当前源：${(value.sources || []).join('、')}` }]
+        },
+      },
+      execute: async (args: any) => {
+        const res = registerSource({ id: args.id, url: args.url, kind: args.kind, label: args.label })
+        return res.ok
+          ? { ok: true, sources: allSources().map((s) => s.id) }
+          : { ok: false, error: res.error ?? 'unknown' }
+      },
+    }),
+  )
+
+  ctx.tools.register(
+    defineTool({
+      name: 'journal_list_sources',
+      description: '列出全部监控源（内置 + 自定义），含 id/类型/URL。',
+      parameters: {},
+      output: {
+        schema: {
+          type: 'object',
+          properties: {
+            count: { type: 'number' },
+            sources: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          },
+          additionalProperties: false,
+        },
+        render: (_args: unknown, value: any) => {
+          const lines = (value.sources || []).map((s: any) => `- ${s.id}（${s.kind ?? 'rss'}）${s.url ? ' ' + s.url : ''}`)
+          return [{ type: 'text', text: `[journal_list_sources] 共 ${value.count} 个源\n${lines.join('\n')}` }]
+        },
+      },
+      execute: async () => {
+        return { count: allSources().length, sources: allSources().map((s) => ({ id: s.id, kind: s.kind ?? 'rss', url: s.url ?? '' })) }
       },
     }),
   )

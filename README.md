@@ -6,7 +6,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![dsh-plugin](https://img.shields.io/badge/ecosystem-dsh--plugin-orange)](https://github.com/topics/dsh-plugin)
 
-> **⚠️ 状态（诚实声明）**：v0.9.0 = 可用原型。已实现并实测：多源抓取（NBER 42 条 ✓ + arXiv 三类目各 10 条 ✓ + **《世界经济》7+8 条、《中国农村观察》41 条、《财贸经济》10 条、《中国人口科学》42 条——4 个中文经管期刊源**）、关键词过滤（✓ 单测）、工具注册（5 工具 ✓）、**推送链路端到端（✓ 本地 mock 服务器 5 集成测试）**、去重持久化（✓）、**定时简报 schedule_create 协议端到端（✓ 真实 dsh-schedule API 6 用例）**、**插件树加载探针（✓ 真实 dsh-tools API）**。**未实现**：真实 Bark/飞书推送（代码+链路已验证，需真实 webhook 最终确认）、Web/UI 端到端验收、定时调度会话内执行（协议已验证）。
+> **⚠️ 状态（诚实声明）**：v1.0.0 = 可用原型。已实现并实测：多源抓取（NBER 42 条 ✓ + arXiv 三类目各 10 条 ✓ + **4 个中文经管期刊源 101 条 ✓**）、关键词过滤（✓ 单测）、工具注册（**7 工具** ✓）、**推送链路端到端（✓ 本地 mock 服务器 5 集成测试）**、去重持久化（✓）、**定时简报 schedule_create 协议端到端（✓ 真实 dsh-schedule API 6 用例）**、**插件树加载探针（✓ 真实 dsh-tools API）**、**运行时自定义源（✓ journal_add_source 注册/去重/校验 + journal_list_sources）**。**未实现**：真实 Bark/飞书推送（代码+链路已验证，需真实 webhook 最终确认）、Web/UI 端到端验收、定时调度会话内执行（协议已验证，执行需 API key 会话）。
 
 ## 为什么是真插件，不是 skill
 
@@ -33,16 +33,18 @@ dsh plugin --profile headless add git+https://github.com/SIMON-WORLD/dsh-journal
 
 对话里直接说人话：
 
-1. **抓**：`journal_scan`（默认全部经济源：NBER + arXiv econ.GN/EM/TH + q-fin.GN；可传 `source` 指定单个源，或 `sourceUrl` 抓任意 RSS）
+1. **抓**：`journal_scan`（默认全部经济源：NBER + arXiv econ.GN/EM/TH + q-fin.GN + 世界经济×2 + 中国农村观察 + 财贸经济 + 中国人口科学；可传 `source` 指定单个源，或 `sourceUrl` 抓任意 RSS）
 2. **筛**：`journal_filter`（关键词如 `["china","trade","labor","did"]`，标题+摘要子串匹配，大小写不敏感）
 3. **推**：`journal_push`（默认 dry-run 只记录；配 webhook 后真实推送）
 4. **查**：`journal_status`（已推送记录 + 去重依据）
 5. **定时**：`journal_briefing`（生成 `schedule_create` 参数 + 监控提示词，配合内置 dsh-schedule 每日/每周自动跑）
+6. **自定义源**：`journal_add_source`（会话内注册 RSS/arXiv/CN 源）+ `journal_list_sources`（查看全部源）
 
 ```text
 用 journal_scan 抓最新 NBER 论文，用 journal_filter 筛出含 "china" 或 "trade" 的，
 再用 journal_push 推送（dry-run），最后 journal_status 看看记录。
 想每天自动跑：journal_briefing(topic="中国贸易", interval_days=1) 然后用返回的 every_seconds 建 schedule_create。
+想监控其他期刊：journal_add_source(id="my-journal", url="https://example.com/feed.xml", kind="rss")
 ```
 
 ## 真实推送配置
@@ -77,10 +79,17 @@ dsh plugin --profile headless add git+https://github.com/SIMON-WORLD/dsh-journal
 - 参数：`topic`（简报主题）、`interval_days`（间隔天数，默认 1）
 - 输出：`every_seconds` + `schedule_prompt`，可直接传给内置 `schedule_create` 建立定时监控
 
+### `journal_add_source`（v1.0.0 新增）
+- 参数：`id`（源唯一 id）、`url`（RSS/CN 平台 URL）、`kind`（rss/arxiv/cn-toc/ajcass）、`label`（显示名）
+- 会话内有效（重启失效）；重复 id / 非法 id / 缺 url 会校验拒绝
+
+### `journal_list_sources`（v1.0.0 新增）
+- 列出全部监控源（内置 + 自定义），含 id/类型/URL
+
 ## 最小闭环（scan → plan → apply → verify）
 
 ```
-scan（抓 RSS/API）→ filter（plan：关键词筛选）→ push（apply：推送）→ status（verify：查状态）→ 状态文件（rollback：删除行即可回滚）→ briefing（schedule_create 定时）
+scan（抓 RSS/API/CN 目录）→ filter（plan：关键词筛选）→ push（apply：推送）→ status（verify：查状态）→ 状态文件（rollback：删除行即可回滚）→ briefing（schedule_create 定时）→ add_source（自定义源扩展）
 ```
 
 ## 开发与验证（门禁）
@@ -95,17 +104,18 @@ npm test             # 单测（parseFeed/filterItems/itemId，6 用例）
 **门禁清单（达到才可发版）**：
 
 - [x] typecheck 通过（erasableSyntaxOnly）
-- [x] 单测 + 集成测试 26/26 通过（含推送链路 mock 服务器端到端）
-- [x] 真实抓取验证：NBER RSS 42 条、arXiv econ.GN/EM/q-fin.GN 各 10 条、**《世界经济》7+8、《中国农村观察》41、《财贸经济》10、《中国人口科学》42**
+- [x] 单测 + 集成测试 28/28 通过（含推送链路 mock + registerSource 校验）
+- [x] 真实抓取验证：NBER RSS 42 条、arXiv econ.GN/EM/q-fin.GN 各 10 条、**4 中文经管源 101 条（世界经济 15 / 农村观察 41 / 财贸 10 / 人口科学 42）**
 - [x] 插件契约：name/inject/apply + cordis.patch.yml + dsh.bundle 完整
-- [x] 工具注册：5 工具注册成功（真实 dsh-tools API）
+- [x] 工具注册：**7 工具**注册成功（真实 dsh-tools API）
 - [x] **插件树加载探针：scripts/probe-embed.mjs（真实 dsh-tools 端到端，已入 CI）**
 - [x] **推送链路端到端：Bark GET / 飞书 POST / dry-run / 去重（本地 mock 服务器）**
 - [x] **定时调度协议端到端：scripts/probe-schedule.mjs（真实 dsh-schedule API，6 用例，已入 CI）**
+- [x] **运行时自定义源：journal_add_source 注册/去重/校验 + journal_list_sources（端到端实测）**
 - [ ] 真实 Bark/飞书推送最终确认（需真实 webhook）
 - [ ] CI 全绿（仓库已建，CI 自动跑）
 - [ ] Web/UI 端到端验收
-- [ ] 定时调度会话内实际执行（需 dsh 会话实测）
+- [ ] 定时调度会话内实际执行（需 API key + dsh 会话实测）
 
 ## 路线图（不铺开，逐个门禁）
 
@@ -118,8 +128,9 @@ npm test             # 单测（parseFeed/filterItems/itemId，6 用例）
 - [x] v0.7.0：**推送链路端到端验证（本地 mock 服务器）**
 - [x] v0.8.0：**定时调度协议端到端（真实 dsh-schedule API）**
 - [x] v0.9.0：**《财贸经济》《中国人口科学》（ajcass v2 版式 + 截断标题去重）**
-- [ ] v1.0.0：真实 webhook 最终确认 + 定时调度会话内执行
-- [ ] v1.1.0：更多中文经管期刊（管理世界/经济研究——经 CNKI 平台需登录态，评估可行性）+ 引用核验联动
+- [x] v1.0.0：**运行时自定义源（journal_add_source/list_sources，7 工具）**
+- [ ] v1.1.0：真实 webhook 最终确认 + 定时调度会话内执行
+- [ ] v1.2.0：更多中文经管期刊（管理世界/经济研究——经 CNKI 平台需登录态，评估可行性）+ 引用核验联动
 
 ## 文档
 
