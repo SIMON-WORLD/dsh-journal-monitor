@@ -3,7 +3,7 @@
 > 每个源都必须通过 `node scripts/verify-live.mjs` 真实可达验证后才能标记「可用」。
 > 状态：🟢 已验证 / 🟡 规划中 / ⚪ 待验证
 
-## 内置源（v0.9.0）
+## 内置源（v1.1.0）
 
 | 源 | URL/API | 类型 | 状态 |
 |---|---|---|---|
@@ -17,6 +17,7 @@
 | **中国农村观察** | https://zgncgc.ajcass.com/ | ajcass 旧版式 | 🟢 已实测（41 条） |
 | **财贸经济** | https://cmjj.ajcass.com/ | ajcass 新版式（含摘要） | 🟢 已实测（10 条） |
 | **中国人口科学** | https://zgrkkx.ajcass.com/ | ajcass 新版式 | 🟢 已实测（42 条） |
+| **经济管理** | https://jjgl.ajcass.com/ | ajcass 路径式 href | 🟢 已实测（15 条） |
 
 ## 中文经管期刊源扩展（探测记录 2026-08-17）
 

@@ -1,7 +1,7 @@
 {
   "name": "dsh-journal-monitor",
-  "description": "经管期刊/工作论文监控推送插件（经济学垂直）：arXiv 多类目 API + NBER RSS + 中文经管期刊（世界经济/中国农村观察/财贸经济/中国人口科学）抓取 → 关键词过滤 → dry-run/Webhook 推送（含本地 mock 集成测试）→ 去重持久化 → 定时简报（schedule_create 协议端到端验证）→ 运行时自定义源。含真实 dsh-tools 插件树加载探针。",
-  "version": "1.0.0",
+  "description": "经管期刊/工作论文监控推送插件（经济学垂直）：arXiv 多类目 API + NBER RSS + 中文经管期刊（世界经济/中国农村观察/财贸经济/中国人口科学/经济管理）抓取 → 关键词过滤 → dry-run/Webhook 推送（含本地 mock 集成测试）→ 去重持久化 → 定时简报（schedule_create 协议端到端验证）→ 运行时自定义源。含真实 dsh-tools 插件树加载探针。",
+  "version": "1.1.0",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

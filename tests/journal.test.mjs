@@ -235,6 +235,17 @@ test('parseAjcass: 同 href 截断标题去重（保留更长标题）', () => {
   assert.equal(items[0].title, '中国儿童居住安排变迁及其对')
 })
 
+test('parseAjcass: 路径式 href（经济管理 /Magazine/Show/NNN）', () => {
+  const html = `<html><body><ul>
+    <li><a href="/Magazine/Show/118399" title="数据要素市场化对企业数字化创新的影响">数据要素市场化对企业数字化创新的影响</a></li>
+    <li><a href="/Magazine/Show/118647" title="供应链集中与“专精特新”企业创新质量">供应链集中与“专精特新”企业创新质量</a></li>
+  </ul></body></html>`
+  const items = parseAjcass(html, 'https://jjgl.ajcass.com/')
+  assert.equal(items.length, 2)
+  assert.equal(items[0].title, '数据要素市场化对企业数字化创新的影响')
+  assert.match(items[0].link, /Magazine\/Show\/118399/)
+})
+
 test('parseAjcass: 空输入返回空数组', () => {
   assert.equal(parseAjcass('', 'https://x/').length, 0)
   assert.equal(parseAjcass('<html><a href="/a">首页</a></html>', 'https://x/').length, 0)

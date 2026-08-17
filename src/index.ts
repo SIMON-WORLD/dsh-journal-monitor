@@ -72,6 +72,12 @@ export const ECON_SOURCES = [
     label: '中国人口科学（中文经管）',
     url: 'https://zgrkkx.ajcass.com/',
   },
+  {
+    id: 'jjgl',
+    kind: 'ajcass',
+    label: '经济管理（中文经管）',
+    url: 'https://jjgl.ajcass.com/',
+  },
 ]
 
 /** 内置默认 RSS 源（v0.1.0 兼容：journal_scan 无参调用） */
@@ -234,22 +240,28 @@ export function parseAjcass(html: string, baseUrl: string): Array<Record<string,
     })
   }
 
-  // 版式 B：新版（财贸经济/中国人口科学）——<li><h3><a>标题</a></h3><p>作者</p><p><span>卷期</span><a class="zy" title="摘要">
+  // 版式 B：新版（财贸经济/中国人口科学/经济管理）——<li><h3><a>标题</a></h3> 或 <li><a title="标题">
+  // href 支持查询式（?id=NNN / ?ID=NNN）与路径式（/Show/NNN）
   // 跨 li 可能同一 href 出现截断标题（…）与完整标题，按 href 全局保留最长标题
   const byHref = new Map<string, { title: string; block: string }>()
   const liRe = /<li\b[^>]*>([\s\S]*?)<\/li>/gi
   let lm: RegExpExecArray | null
   while ((lm = liRe.exec(html)) !== null) {
     const block = lm[1]
-    const href = block.match(/href="(\/Magazine\/Show\?(?:ID|id)=\d+)"/)?.[1]
+    const href =
+      block.match(/href="(\/Magazine\/Show(?:\?(?:ID|id)=\d+|\/\d+))"/)?.[1] ??
+      block.match(/href="(\/Magazine\/Show\/\d+)"/)?.[1]
     if (!href) continue
-    // 取 li 内最长的 a 文本作为标题（截断版 … 会被完整版覆盖）
+    // 取 li 内最长的 a 文本或 title 属性作为标题
     let bestTitle = ''
     const aRe = /<a[^>]*>([\s\S]{2,220}?)<\/a>/g
     let am: RegExpExecArray | null
     while ((am = aRe.exec(block)) !== null) {
       const t = am[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
       if (t.length > bestTitle.length) bestTitle = t
+    }
+    if (bestTitle.length < 4) {
+      bestTitle = block.match(/title="([\s\S]{2,220}?)"/)?.[1]?.replace(/\s+/g, ' ').trim() ?? ''
     }
     if (!bestTitle || bestTitle.length < 4 || /^\[?(摘要|PDF|下载)/.test(bestTitle)) continue
     const absHref = href.startsWith('http') ? href : new URL(href, baseUrl).href

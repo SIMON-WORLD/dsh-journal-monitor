@@ -76,6 +76,18 @@ const CHECKS = [
         return parseAjcass(await r.text(), 'https://zgrkkx.ajcass.com/')
       }),
   },
+  {
+    label: '经济管理当期目录 (ajcass path-href)',
+    soft: true,
+    run: () =>
+      fetch('https://jjgl.ajcass.com/', {
+        signal: AbortSignal.timeout(25000),
+        headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36' },
+      }).then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return parseAjcass(await r.text(), 'https://jjgl.ajcass.com/')
+      }),
+  },
 ]
 
 let failures = 0

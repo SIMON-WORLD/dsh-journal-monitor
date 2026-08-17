@@ -6,7 +6,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![dsh-plugin](https://img.shields.io/badge/ecosystem-dsh--plugin-orange)](https://github.com/topics/dsh-plugin)
 
-> **⚠️ 状态（诚实声明）**：v1.0.0 = 可用原型。已实现并实测：多源抓取（NBER 42 条 ✓ + arXiv 三类目各 10 条 ✓ + **4 个中文经管期刊源 101 条 ✓**）、关键词过滤（✓ 单测）、工具注册（**7 工具** ✓）、**推送链路端到端（✓ 本地 mock 服务器 5 集成测试）**、去重持久化（✓）、**定时简报 schedule_create 协议端到端（✓ 真实 dsh-schedule API 6 用例）**、**插件树加载探针（✓ 真实 dsh-tools API）**、**运行时自定义源（✓ journal_add_source 注册/去重/校验 + journal_list_sources）**。**未实现**：真实 Bark/飞书推送（代码+链路已验证，需真实 webhook 最终确认）、Web/UI 端到端验收、定时调度会话内执行（协议已验证，执行需 API key 会话）。
+> **⚠️ 状态（诚实声明）**：v1.1.0 = 可用原型。已实现并实测：多源抓取（NBER 42 条 ✓ + arXiv 三类目各 10 条 ✓ + **5 个中文经管期刊源 123 条 ✓**）、关键词过滤（✓ 单测）、工具注册（**7 工具** ✓）、**推送链路端到端（✓ 本地 mock 服务器 5 集成测试）**、去重持久化（✓）、**定时简报 schedule_create 协议端到端（✓ 真实 dsh-schedule API 6 用例）**、**插件树加载探针（✓ 真实 dsh-tools API）**、**运行时自定义源（✓ journal_add_source/journal_list_sources）**。**未实现**：真实 Bark/飞书推送（代码+链路已验证，需真实 webhook 最终确认）、Web/UI 端到端验收、定时调度会话内执行（协议已验证，执行需 API key 会话）。
 
 ## 为什么是真插件，不是 skill
 
@@ -104,14 +104,14 @@ npm test             # 单测（parseFeed/filterItems/itemId，6 用例）
 **门禁清单（达到才可发版）**：
 
 - [x] typecheck 通过（erasableSyntaxOnly）
-- [x] 单测 + 集成测试 28/28 通过（含推送链路 mock + registerSource 校验）
-- [x] 真实抓取验证：NBER RSS 42 条、arXiv econ.GN/EM/q-fin.GN 各 10 条、**4 中文经管源 101 条（世界经济 15 / 农村观察 41 / 财贸 10 / 人口科学 42）**
+- [x] 单测 + 集成测试 29/29 通过（含推送链路 mock + registerSource 校验 + 路径式 href）
+- [x] 真实抓取验证：NBER RSS 42 条、arXiv econ.GN/EM/q-fin.GN 各 10 条、**5 中文经管源 123 条（世界经济 15 / 农村观察 41 / 财贸 10 / 人口科学 42 / 经济管理 15）**
 - [x] 插件契约：name/inject/apply + cordis.patch.yml + dsh.bundle 完整
 - [x] 工具注册：**7 工具**注册成功（真实 dsh-tools API）
 - [x] **插件树加载探针：scripts/probe-embed.mjs（真实 dsh-tools 端到端，已入 CI）**
 - [x] **推送链路端到端：Bark GET / 飞书 POST / dry-run / 去重（本地 mock 服务器）**
 - [x] **定时调度协议端到端：scripts/probe-schedule.mjs（真实 dsh-schedule API，6 用例，已入 CI）**
-- [x] **运行时自定义源：journal_add_source 注册/去重/校验 + journal_list_sources（端到端实测）**
+- [x] **运行时自定义源：journal_add_source/journal_list_sources（端到端实测）**
 - [ ] 真实 Bark/飞书推送最终确认（需真实 webhook）
 - [ ] CI 全绿（仓库已建，CI 自动跑）
 - [ ] Web/UI 端到端验收
@@ -129,8 +129,9 @@ npm test             # 单测（parseFeed/filterItems/itemId，6 用例）
 - [x] v0.8.0：**定时调度协议端到端（真实 dsh-schedule API）**
 - [x] v0.9.0：**《财贸经济》《中国人口科学》（ajcass v2 版式 + 截断标题去重）**
 - [x] v1.0.0：**运行时自定义源（journal_add_source/list_sources，7 工具）**
-- [ ] v1.1.0：真实 webhook 最终确认 + 定时调度会话内执行
-- [ ] v1.2.0：更多中文经管期刊（管理世界/经济研究——经 CNKI 平台需登录态，评估可行性）+ 引用核验联动
+- [x] v1.1.0：**《经济管理》（ajcass 路径式 href）——5 中文经管源 123 条**
+- [ ] v1.2.0：真实 webhook 最终确认 + 定时调度会话内执行
+- [ ] v1.3.0：更多中文经管期刊（管理世界/经济研究——经 CNKI 平台需登录态，评估可行性）+ 引用核验联动
 
 ## 文档
 
