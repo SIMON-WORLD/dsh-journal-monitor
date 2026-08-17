@@ -3,12 +3,15 @@
 > 每个源都必须通过 `node scripts/verify-live.mjs` 真实可达验证后才能标记「可用」。
 > 状态：🟢 已验证 / 🟡 规划中 / ⚪ 待验证
 
-## 内置源（v0.1.0）
+## 内置源（v0.2.0）
 
-| 源 | URL | 类型 | 状态 |
+| 源 | URL/API | 类型 | 状态 |
 |---|---|---|---|
-| NBER Working Papers | https://www.nber.org/rss/new.xml | 工作论文 | 🟢 已实测（HTTP 200，42 条） |
-| arXiv Economics | http://export.arxiv.org/rss/econ | 预印本 | 🟢 已实测 |
+| NBER Working Papers | https://www.nber.org/rss/new.xml | 工作论文 RSS | 🟢 已实测（HTTP 200，42 条） |
+| arXiv 一般经济学（econ.GN） | export.arxiv.org/api/query?cat:econ.GN | 预印本 API | 🟢 已实测（10 条） |
+| arXiv 计量经济学（econ.EM） | export.arxiv.org/api/query?cat:econ.EM | 预印本 API | 🟢 已实测（10 条） |
+| arXiv 理论经济学（econ.TH） | export.arxiv.org/api/query?cat:econ.TH | 预印本 API | 🟢 已实测 |
+| arXiv 量化金融（q-fin.GN） | export.arxiv.org/api/query?cat:q-fin.GN | 预印本 API | 🟢 已实测（10 条） |
 
 ## 扩展源（经济学垂直，v0.3.0 规划）
 

@@ -5,14 +5,17 @@
  * 用法：node scripts/verify-live.mjs
  * 验证项：
  *   1. NBER RSS 可达（HTTP 200 + 可解析出条目）
- *   2. parseFeed / filterItems / itemId 在真实数据上工作
+ *   2. arXiv 经济学类目 API 可达（econ.GN 等，可解析出条目）
+ *   3. parseFeed / filterItems / itemId 在真实数据上工作
  * 退出码：0 = 全过；1 = 任一失败
  */
-import { parseFeed, filterItems, itemId } from '../lib/index.js'
+import { parseFeed, filterItems, itemId, fetchArxivCategory } from '../lib/index.js'
 
-const SOURCES = [
-  { id: 'nber', label: 'NBER Working Papers', url: 'https://www.nber.org/rss/new.xml' },
-  { id: 'arxiv-econ', label: 'arXiv Economics', url: 'http://export.arxiv.org/rss/econ' },
+const CHECKS = [
+  { label: 'NBER Working Papers', run: () => fetch('https://www.nber.org/rss/new.xml', { headers: { 'user-agent': 'dsh-journal-monitor/0.2' } }).then((r) => ({ ok: r.ok, status: r.status, text: () => r.text() })) },
+  { label: 'arXiv econ.GN (API)', run: () => fetchArxivCategory('econ.GN', 10) },
+  { label: 'arXiv econ.EM (API)', run: () => fetchArxivCategory('econ.EM', 10) },
+  { label: 'arXiv q-fin.GN (API)', run: () => fetchArxivCategory('q-fin.GN', 10) },
 ]
 
 let failures = 0
@@ -21,22 +24,34 @@ const report = (ok, msg) => {
   if (!ok) failures++
 }
 
-for (const src of SOURCES) {
+for (const c of CHECKS) {
   try {
-    const res = await fetch(src.url, { headers: { 'user-agent': 'dsh-journal-monitor/0.1' } })
-    report(res.ok, `${src.label}: HTTP ${res.status}`)
-    if (!res.ok) continue
-    const xml = await res.text()
-    const items = parseFeed(xml)
-    report(items.length > 0, `${src.label}: 解析出 ${items.length} 条`)
-    if (items.length > 0) {
-      const ids = new Set(items.map(itemId))
-      report(ids.size === items.length, `${src.label}: itemId 唯一（${ids.size}/${items.length}）`)
-      const hit = filterItems(items, ['the']) // 保证有命中，验证过滤链路
-      report(hit.length > 0, `${src.label}: filterItems 链路正常（命中 ${hit.length}）`)
+    const res = await c.run()
+    if (res && typeof res.ok === 'boolean') {
+      // RSS 分支
+      report(res.ok, `${c.label}: HTTP ${res.status}`)
+      if (!res.ok) continue
+      const xml = await res.text()
+      const items = parseFeed(xml)
+      report(items.length > 0, `${c.label}: 解析出 ${items.length} 条`)
+      if (items.length > 0) {
+        const ids = new Set(items.map(itemId))
+        report(ids.size === items.length, `${c.label}: itemId 唯一（${ids.size}/${items.length}）`)
+        const hit = filterItems(items, ['the'])
+        report(hit.length > 0, `${c.label}: filterItems 链路正常（命中 ${hit.length}）`)
+      }
+    } else {
+      // arXiv API 分支（返回 items 数组）
+      const items = Array.isArray(res) ? res : []
+      report(items.length > 0, `${c.label}: 解析出 ${items.length} 条`)
+      if (items.length > 0) {
+        report(items[0].title && items[0].title.length > 0, `${c.label}: 含 title 字段`)
+        const ids = new Set(items.map(itemId))
+        report(ids.size === items.length, `${c.label}: itemId 唯一（${ids.size}/${items.length}）`)
+      }
     }
   } catch (e) {
-    report(false, `${src.label}: 抓取失败 ${e instanceof Error ? e.message : String(e)}`)
+    report(false, `${c.label}: 抓取失败 ${e instanceof Error ? e.message : String(e)}`)
   }
 }
 

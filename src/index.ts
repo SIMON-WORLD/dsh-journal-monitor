@@ -1,32 +1,35 @@
 /**
  * dsh-journal-monitor — 经管期刊/工作论文监控推送插件
  *
- * 真插件（非 skill）：RSS 抓取 → 关键词过滤 → 推送 → 去重持久化。
+ * 真插件（非 skill）：RSS/API 抓取 → 关键词过滤 → 推送 → 去重持久化 → 定时调度。
  * 最小闭环：scan → filter(plan) → push(apply) → status(verify) → rollback。
+ * 定时：journal_briefing 生成 schedule_create 参数（复用内置 dsh-schedule 协议）。
  * 默认 dry-run：不真正发送推送，只输出将推送内容，配置 webhook 后启用真实推送。
  *
+ * v0.2.0 变更：并入 schedule-briefing 的 arXiv 多类目 API 抓取 + 定时简报参数生成。
  * 标准 DSH 插件格式：cordis.patch.yml 挂载 + defineTool 注册。
  * 依赖：Node >= 18（全局 fetch），运行时零第三方依赖。
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync } from 'node:fs'
-import { dirname, resolve, join } from 'node:path'
+import { readFileSync, mkdirSync, existsSync, appendFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 
 export const name = 'dsh-journal-monitor'
 export const inject = ['tools']
 
-/** 内置默认源：工作论文 + arXiv 经济学（可被用户配置覆盖） */
+/** 经济学文献源：arXiv 多类目（API）+ NBER RSS */
+export const ECON_SOURCES = [
+  { id: 'arxiv-econ.GN', kind: 'arxiv', label: 'arXiv 一般经济学' },
+  { id: 'arxiv-econ.EM', kind: 'arxiv', label: 'arXiv 计量经济学' },
+  { id: 'arxiv-econ.TH', kind: 'arxiv', label: 'arXiv 理论经济学' },
+  { id: 'arxiv-q-fin.GN', kind: 'arxiv', label: 'arXiv 量化金融' },
+  { id: 'nber', kind: 'rss', label: 'NBER Working Papers', url: 'https://www.nber.org/rss/new.xml' },
+]
+
+/** 内置默认 RSS 源（v0.1.0 兼容：journal_scan 无参调用） */
 const DEFAULT_SOURCES = [
-  {
-    id: 'nber',
-    label: 'NBER Working Papers',
-    url: 'https://www.nber.org/rss/new.xml',
-  },
-  {
-    id: 'arxiv-econ',
-    label: 'arXiv Economics',
-    url: 'http://export.arxiv.org/rss/econ',
-  },
+  { id: 'nber', label: 'NBER Working Papers', url: 'https://www.nber.org/rss/new.xml' },
+  { id: 'arxiv-econ', label: 'arXiv Economics', url: 'http://export.arxiv.org/rss/econ' },
 ]
 
 /** 状态文件位置：DSH_JOURNAL_STATE 环境变量 > 工作区 .dsh-journal-monitor/state.jsonl */
@@ -64,7 +67,7 @@ async function fetchFeed(url: string, timeoutMs = 20000): Promise<Array<Record<s
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), timeoutMs)
   try {
-    const res = await fetch(url, { signal: ctrl.signal, headers: { 'user-agent': 'dsh-journal-monitor/0.1' } })
+    const res = await fetch(url, { signal: ctrl.signal, headers: { 'user-agent': 'dsh-journal-monitor/0.2' } })
     if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`)
     const xml = await res.text()
     return parseFeed(xml)
@@ -95,7 +98,7 @@ export function parseFeed(xml: string): Array<Record<string, string>> {
         .replace(/\s+/g, ' ')
         .trim()
     }
-    const linkRaw = grab('link')
+    const linkRaw = grab('link') || grab('id')
     // Atom 的 link 是属性形式 <link href="..."/> 时上面拿不到，补一个属性提取
     const hrefMatch = block.match(/<link\b[^>]*href="([^"]+)"/i)
     const title = grab('title')
@@ -110,7 +113,25 @@ export function parseFeed(xml: string): Array<Record<string, string>> {
   return items
 }
 
-/** 关键词过滤：标题+摘要小写匹配，支持用 | 分隔的正则片段。 */
+/** 抓取 arXiv 类目（API，支持 econ.GN / econ.EM / econ.TH / q-fin.GN）。 */
+export async function fetchArxivCategory(category: string, limit = 10, timeoutMs = 20000): Promise<Array<Record<string, string>>> {
+  const url = `http://export.arxiv.org/api/query?search_query=cat:${encodeURIComponent(category)}&sortBy=submittedDate&sortOrder=descending&max_results=${limit}`
+  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
+  if (!res.ok) throw new Error(`arXiv API HTTP ${res.status}`)
+  return parseFeed(await res.text())
+}
+
+/** 按源 id 抓取：arXiv 类目（arxiv-*）走 API，其余按 RSS URL。 */
+async function fetchSource(src: { id: string; kind?: string; url?: string }, limit: number): Promise<Array<Record<string, string>>> {
+  if (src.kind === 'arxiv' || /^arxiv-/.test(src.id)) {
+    const cat = src.id.replace(/^arxiv-/, '')
+    return fetchArxivCategory(cat, limit)
+  }
+  if (src.url) return fetchFeed(src.url)
+  return []
+}
+
+/** 关键词过滤：标题+摘要小写匹配。 */
 export function filterItems(items: Array<Record<string, string>>, keywords: string[]): Array<Record<string, string>> {
   if (!keywords || keywords.length === 0) return items
   const kws = keywords.map((k) => k.toLowerCase().trim()).filter(Boolean)
@@ -128,6 +149,19 @@ export function itemId(it: Record<string, string>): string {
     h = (h * 31 + base.charCodeAt(i)) | 0
   }
   return `jm-${h.toString(16)}`
+}
+
+/** 构建 schedule_create 参数 + 自包含监控提示词（复用内置 dsh-schedule 协议）。 */
+export function buildBriefing(topic: string, intervalDays: number): { every_seconds: number; schedule_prompt: string } {
+  const everySeconds = Math.max(300, Math.max(1, Math.floor(intervalDays)) * 86400)
+  const sourceIds = ECON_SOURCES.map((s) => s.id).join('、')
+  const prompt = [
+    `[经济文献简报] 主题：${topic}`,
+    `监控源：${sourceIds}`,
+    `步骤：1) 对每个源调用 journal_scan 拉取最近文献；2) 用 journal_filter 按主题关键词过滤；3) 用 journal_push 推送（dry-run 或 webhook）；4) 用 journal_status 查看去重记录。`,
+    `只汇报真实抓取到的条目，不要臆造。`,
+  ].join('\n')
+  return { every_seconds: everySeconds, schedule_prompt: prompt }
 }
 
 /** 推送：默认 dry-run 只打印；配置 barkUrl / feishuUrl 任一才真实发送。 */
@@ -175,9 +209,10 @@ export function apply(ctx: any): void {
     defineTool({
       name: 'journal_scan',
       description:
-        '抓取经管期刊/工作论文 RSS 源，返回论文条目列表（title/link/summary/date）。内置源：NBER Working Papers、arXiv Economics；可用 sourceUrl 传任意 RSS/Atom。',
+        '抓取经管期刊/工作论文源，返回论文条目列表。源：nber（RSS）、arxiv-econ.GN/EM/TH、arxiv-q-fin.GN（API）、任意 RSS/Atom URL（sourceUrl）。不传参数默认抓全部经济源。',
       parameters: {
-        sourceUrl: { type: 'string', description: '自定义 RSS/Atom URL（可选）' },
+        source: { type: 'string', description: '源 id：nber / arxiv-econ.GN / arxiv-econ.EM / arxiv-econ.TH / arxiv-q-fin.GN' },
+        sourceUrl: { type: 'string', description: '自定义 RSS/Atom URL（可选，优先级高于 source）' },
         limit: { type: 'number', description: '最多返回条数，默认 20' },
       },
       output: {
@@ -202,8 +237,26 @@ export function apply(ctx: any): void {
       execute: async (args: any) => {
         const limit = args.limit && Number(args.limit) > 0 ? Number(args.limit) : 20
         try {
-          const items = args.sourceUrl ? await fetchFeed(args.sourceUrl) : await fetchAll(DEFAULT_SOURCES)
-          return { source: args.sourceUrl || DEFAULT_SOURCES.map((s) => s.label).join(', '), count: items.length, items: items.slice(0, limit) }
+          if (args.sourceUrl) {
+            const items = await fetchFeed(args.sourceUrl)
+            return { source: args.sourceUrl, count: items.length, items: items.slice(0, limit) }
+          }
+          if (args.source) {
+            const src = ECON_SOURCES.find((s) => s.id === args.source)
+            if (!src) return { error: `unknown source: ${args.source}（可用 ${ECON_SOURCES.map((s) => s.id).join('、')}）` }
+            const items = await fetchSource(src, limit)
+            return { source: args.source, count: items.length, items: items.slice(0, limit) }
+          }
+          // 默认抓全部 ECON_SOURCES
+          const all: Array<Record<string, string>> = []
+          for (const src of ECON_SOURCES) {
+            try {
+              all.push(...(await fetchSource(src, Math.ceil(limit / ECON_SOURCES.length))))
+            } catch {
+              // 单个源失败不阻断整体
+            }
+          }
+          return { source: ECON_SOURCES.map((s) => s.id).join(', '), count: all.length, items: all.slice(0, limit) }
         } catch (e) {
           return { error: `fetch failed: ${e instanceof Error ? e.message : String(e)}` }
         }
@@ -340,13 +393,39 @@ export function apply(ctx: any): void {
       },
     }),
   )
-}
 
-async function fetchAll(sources: Array<{ id: string; label: string; url: string }>): Promise<Array<Record<string, string>>> {
-  const all: Array<Record<string, string>> = []
-  const results = await Promise.allSettled(sources.map((s) => fetchFeed(s.url)))
-  results.forEach((r) => {
-    if (r.status === 'fulfilled') all.push(...r.value)
-  })
-  return all
+  ctx.tools.register(
+    defineTool({
+      name: 'journal_briefing',
+      description:
+        '生成定时经济文献简报的 schedule_create 参数 + 自包含监控提示词（复用内置 dsh-schedule 的 schedule_create）。返回 every_seconds + schedule_prompt，可据此建立每日/每周监控。',
+      parameters: {
+        topic: { type: 'string', required: true, description: '简报主题（如「数字化转型」「货币政策」）' },
+        interval_days: { type: 'number', description: '监控间隔天数，默认 1' },
+      },
+      output: {
+        schema: {
+          type: 'object',
+          properties: {
+            every_seconds: { type: 'number' },
+            schedule_prompt: { type: 'string' },
+            sources: { type: 'array', items: { type: 'string' } },
+          },
+          additionalProperties: false,
+        },
+        render: (_args: unknown, value: any) => {
+          return [
+            {
+              type: 'text',
+              text: `调用 schedule_create(prompt=<下方提示词>, every_seconds=${value.every_seconds}) 即可建立监控。\n监控源：${(value.sources || []).join('、')}\n\n提示词：\n${value.schedule_prompt}`,
+            },
+          ]
+        },
+      },
+      execute: async (args: any) => {
+        const { every_seconds, schedule_prompt } = buildBriefing(args.topic, args.interval_days ?? 1)
+        return { every_seconds, schedule_prompt, sources: ECON_SOURCES.map((s) => s.id) }
+      },
+    }),
+  )
 }

@@ -1,7 +1,7 @@
 {
   "name": "dsh-journal-monitor",
-  "description": "经管期刊/工作论文监控推送插件：RSS 抓取 → 关键词过滤 → 摘要 → 推送（Bark/飞书/Dry-run）→ 去重持久化。最小闭环 scan/plan/apply/verify/rollback，dry-run 默认。",
-  "version": "0.1.0",
+  "description": "经管期刊/工作论文监控推送插件（经济学垂直）：arXiv 多类目 API + NBER RSS 抓取 → 关键词过滤 → dry-run/Webhook 推送 → 去重持久化 → 定时简报（schedule_create 兼容）。最小闭环 scan/filter/push/status/briefing，dry-run 默认。",
+  "version": "0.2.0",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
