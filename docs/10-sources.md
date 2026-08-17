@@ -3,7 +3,7 @@
 > 每个源都必须通过 `node scripts/verify-live.mjs` 真实可达验证后才能标记「可用」。
 > 状态：🟢 已验证 / 🟡 规划中 / ⚪ 待验证
 
-## 内置源（v0.3.0）
+## 内置源（v0.5.0）
 
 | 源 | URL/API | 类型 | 状态 |
 |---|---|---|---|
@@ -12,7 +12,8 @@
 | arXiv 计量经济学（econ.EM） | export.arxiv.org/api/query?cat:econ.EM | 预印本 API | 🟢 已实测（10 条） |
 | arXiv 理论经济学（econ.TH） | export.arxiv.org/api/query?cat:econ.TH | 预印本 API | 🟢 已实测 |
 | arXiv 量化金融（q-fin.GN） | export.arxiv.org/api/query?cat:q-fin.GN | 预印本 API | 🟢 已实测（10 条） |
-| **世界经济（中文经管）** | https://sjjj.magtech.com.cn/CN/online_first | 中文期刊 HTML 目录 | 🟢 已实测（7 条，abstract*.shtml 解析） |
+| **世界经济·在线预览** | https://sjjj.magtech.com.cn/CN/online_first | 中文期刊 HTML 目录 | 🟢 已实测（7 条） |
+| **世界经济·当期目录** | https://sjjj.magtech.com.cn/CN/home | 中文期刊 HTML 目录（含摘要） | 🟢 已实测（8 条，标题/作者/卷期/摘要全文） |
 
 ## 中文经管期刊源扩展（探测记录 2026-08-17）
 

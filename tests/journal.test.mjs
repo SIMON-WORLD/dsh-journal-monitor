@@ -141,6 +141,30 @@ test('parseCnToc: 解析中文期刊 HTML 目录页（abstract*.shtml 链接）'
   assert.ok(abs && abs.link.startsWith('https://sjjj.magtech.com.cn/CN/abstract/abstract1189.shtml'))
 })
 
+test('parseCnToc: 解析 home 当期目录格式（标题+作者+卷期+摘要）', () => {
+  const html = `<html><body>
+    <li id="art1232">
+      <div class="j-title-1"><a href="https://sjjj.magtech.com.cn/CN/Y2026/V49/I8/3">金融科技创新与企业跨国供应链拓展</a></div>
+      <div class="j-author">李震, 柴范, 方一安, 赵春明</div>
+      <div class="j-volumn-doi"><span class="j-volumn">2026, 49(8): 3-36.</span></div>
+      <div class="j-abstract">金融科技是提升金融服务实体经济质效的重要支撑。</div>
+    </li>
+    <li id="art1233">
+      <div class="j-title-1"><a href="https://sjjj.magtech.com.cn/CN/Y2026/V49/I8/4">货币政策传导的异质性</a></div>
+      <div class="j-author">张三</div>
+      <div class="j-volumn-doi"><span class="j-volumn">2026, 49(8): 37-60.</span></div>
+      <div class="j-abstract">研究货币政策对实体经济的影响。</div>
+    </li>
+  </body></html>`
+  const items = parseCnToc(html, 'https://sjjj.magtech.com.cn/CN/home')
+  assert.equal(items.length, 2)
+  assert.equal(items[0].title, '金融科技创新与企业跨国供应链拓展')
+  assert.equal(items[0].authors, '李震, 柴范, 方一安, 赵春明')
+  assert.match(items[0].date, /49\(8\)/)
+  assert.match(items[0].summary, /金融科技/)
+  assert.match(items[0].link, /V49\/I8\/3/)
+})
+
 test('parseCnToc: 空输入/无文章返回空数组', () => {
   assert.equal(parseCnToc('', 'https://x/').length, 0)
   assert.equal(parseCnToc('<html><a href="/a">首页</a></html>', 'https://x/').length, 0)

@@ -27,6 +27,17 @@ const CHECKS = [
         return parseCnToc(await r.text(), 'https://sjjj.magtech.com.cn/CN/online_first')
       }),
   },
+  {
+    label: '世界经济当期目录 home (CN TOC full)',
+    run: () =>
+      fetch('https://sjjj.magtech.com.cn/CN/home', {
+        signal: AbortSignal.timeout(25000),
+        headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36' },
+      }).then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return parseCnToc(await r.text(), 'https://sjjj.magtech.com.cn/CN/home')
+      }),
+  },
 ]
 
 let failures = 0

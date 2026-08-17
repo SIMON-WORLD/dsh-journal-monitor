@@ -30,6 +30,12 @@ export const ECON_SOURCES = [
     label: '世界经济（中文经管）',
     url: 'https://sjjj.magtech.com.cn/CN/online_first',
   },
+  {
+    id: 'sjjj-current',
+    kind: 'cn-toc',
+    label: '世界经济当期目录（含摘要）',
+    url: 'https://sjjj.magtech.com.cn/CN/home',
+  },
 ]
 
 /** 内置默认 RSS 源（v0.1.0 兼容：journal_scan 无参调用） */
@@ -127,10 +133,32 @@ export async function fetchArxivCategory(category: string, limit = 10, timeoutMs
   return parseFeed(await res.text())
 }
 
-/** 解析中文期刊 HTML 目录页（玛格泰克平台 online_first 等）：提取 abstract*.shtml 链接与标题。 */
+/** 解析中文期刊 HTML 目录页（玛格泰克平台）：支持两种格式——
+ * 1) online_first：abstract*.shtml 链接 + 标题
+ * 2) home 当期目录：j-title-1（标题）+ j-author（作者）+ j-volumn-doi（卷期页码）+ j-abstract（摘要）
+ */
 export function parseCnToc(html: string, baseUrl: string): Array<Record<string, string>> {
   const items: Array<Record<string, string>> = []
   const seen = new Set<string>()
+
+  // 格式 2：home 当期目录（更完整：作者/卷期/摘要）
+  const fullRe = /<div class="j-title-1">\s*<a href="([^"]+)">([\s\S]*?)<\/a>[\s\S]*?<div class="j-author">([\s\S]*?)<\/div>[\s\S]*?<div class="j-volumn-doi">[\s\S]*?<span class="j-volumn">([\s\S]*?)<\/span>[\s\S]*?<div class="j-abstract">([\s\S]*?)<\/div>/gi
+  let fm: RegExpExecArray | null
+  while ((fm = fullRe.exec(html)) !== null) {
+    const title = fm[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+    if (title.length < 4 || seen.has(title)) continue
+    seen.add(title)
+    const link = fm[1].startsWith('http') ? fm[1] : new URL(fm[1], baseUrl).href
+    items.push({
+      title,
+      link,
+      summary: fm[5].replace(/<[^>]+>/g, '').replace(/&#x0201[cd];/g, '').replace(/&[a-z]+;/g, '').replace(/\s+/g, ' ').trim(),
+      date: fm[4].replace(/\s+/g, ' ').trim(),
+      authors: fm[3].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim(),
+    })
+  }
+
+  // 格式 1：online_first（abstract*.shtml 链接）
   const re = /<a[^>]*href="([^"]*(?:abstract|article|view|online)[^"]*)"[^>]*>([\s\S]{2,180}?)<\/a>/gi
   let m: RegExpExecArray | null
   while ((m = re.exec(html)) !== null) {
@@ -139,7 +167,7 @@ export function parseCnToc(html: string, baseUrl: string): Array<Record<string, 
     if (rawTitle.length < 4 || seen.has(rawTitle)) continue
     seen.add(rawTitle)
     const link = href.startsWith('http') ? href : new URL(href, baseUrl).href
-    items.push({ title: rawTitle, link, summary: '', date: '' })
+    items.push({ title: rawTitle, link, summary: '', date: '', authors: '' })
   }
   return items
 }
