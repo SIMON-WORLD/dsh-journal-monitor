@@ -1,0 +1,7 @@
+node_modules/
+lib/
+*.tsbuildinfo
+.dsh-journal-monitor/
+.env
+*.log
+.DS_Store

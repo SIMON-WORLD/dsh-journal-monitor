@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # 每日 06:00 UTC 跑真实抓取探针，确保源不失效
+    - cron: '0 6 * * *'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: Typecheck
+        run: npm run check
+      - name: Build
+        run: npm run build
+      - name: Unit tests
+        run: npm test
+      - name: Live feed probe (NBER + arXiv econ)
+        run: node scripts/verify-live.mjs
