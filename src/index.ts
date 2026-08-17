@@ -36,6 +36,12 @@ export const ECON_SOURCES = [
     label: '世界经济当期目录（含摘要）',
     url: 'https://sjjj.magtech.com.cn/CN/home',
   },
+  {
+    id: 'zgncgc',
+    kind: 'ajcass',
+    label: '中国农村观察（中文经管）',
+    url: 'https://zgncgc.ajcass.com/',
+  },
 ]
 
 /** 内置默认 RSS 源（v0.1.0 兼容：journal_scan 无参调用） */
@@ -172,6 +178,34 @@ export function parseCnToc(html: string, baseUrl: string): Array<Record<string, 
   return items
 }
 
+/** 解析 ajcass 平台（中国社科院期刊，如《中国农村观察》）当期目录：标题 + 作者 + 卷期 + 摘要链接。 */
+export function parseAjcass(html: string, baseUrl: string): Array<Record<string, string>> {
+  const items: Array<Record<string, string>> = []
+  const seen = new Set<string>()
+  // 按绿色标题块（class="green"）切分，避免 [摘要]/[PDF] 链接干扰
+  const blockRe = /<p[^>]*class="green"[^>]*>([\s\S]*?)<\/p>/gi
+  let bm: RegExpExecArray | null
+  while ((bm = blockRe.exec(html)) !== null) {
+    const block = bm[1]
+    const href = block.match(/href="(\/Magazine\/Show\?id=\d+)"/)?.[1]
+    const title = block.match(/<a[^>]*>([\s\S]{2,200}?)<\/a>/)?.[1]?.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+    const authors = block.match(/作者:([\s\S]{2,80}?)<\/span>|<span>作者:([\s\S]{2,80}?)</)?.[1] || block.match(/作者:([\s\S]{2,80}?)(?:<|$)/)?.[1]
+    if (!title || title.length < 4 || seen.has(title)) continue
+    seen.add(title)
+    // 卷期：从绿色块之后的 300 字符内找（20xx NO.n）
+    const tail = html.slice(bm.index + bm[0].length, bm.index + bm[0].length + 400)
+    const vol = tail.match(/(20\d{2}\s*NO\.\d+)/)?.[1] ?? ''
+    items.push({
+      title,
+      link: href && href.startsWith('http') ? href : href ? new URL(href, baseUrl).href : '',
+      summary: '',
+      date: vol.trim(),
+      authors: (authors ?? '').replace(/\s+/g, ' ').trim(),
+    })
+  }
+  return items
+}
+
 /** 抓取中文期刊 HTML 目录页。 */
 async function fetchCnToc(url: string, timeoutMs = 25000): Promise<Array<Record<string, string>>> {
   const res = await fetch(url, {
@@ -182,7 +216,17 @@ async function fetchCnToc(url: string, timeoutMs = 25000): Promise<Array<Record<
   return parseCnToc(await res.text(), url)
 }
 
-/** 按源 id 抓取：arXiv 类目（arxiv-*）走 API，cn-toc 走中文 HTML 目录页，其余按 RSS URL。 */
+/** 抓取 ajcass 平台期刊当期目录。 */
+async function fetchAjcass(url: string, timeoutMs = 25000): Promise<Array<Record<string, string>>> {
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(timeoutMs),
+    headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36' },
+  })
+  if (!res.ok) throw new Error(`Ajcass HTTP ${res.status}`)
+  return parseAjcass(await res.text(), url)
+}
+
+/** 按源 id 抓取：arXiv 类目（arxiv-*）走 API，cn-toc 走中文 HTML 目录页，ajcass 走社科院平台，其余按 RSS URL。 */
 async function fetchSource(src: { id: string; kind?: string; url?: string }, limit: number): Promise<Array<Record<string, string>>> {
   if (src.kind === 'arxiv' || /^arxiv-/.test(src.id)) {
     const cat = src.id.replace(/^arxiv-/, '')
@@ -190,6 +234,9 @@ async function fetchSource(src: { id: string; kind?: string; url?: string }, lim
   }
   if (src.kind === 'cn-toc' && src.url) {
     return (await fetchCnToc(src.url)).slice(0, limit)
+  }
+  if (src.kind === 'ajcass' && src.url) {
+    return (await fetchAjcass(src.url)).slice(0, limit)
   }
   if (src.url) return fetchFeed(src.url)
   return []

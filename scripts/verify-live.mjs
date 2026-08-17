@@ -9,7 +9,7 @@
  *   3. parseFeed / filterItems / itemId 在真实数据上工作
  * 退出码：0 = 全过；1 = 任一失败
  */
-import { parseFeed, filterItems, itemId, fetchArxivCategory, parseCnToc } from '../lib/index.js'
+import { parseFeed, filterItems, itemId, fetchArxivCategory, parseCnToc, parseAjcass } from '../lib/index.js'
 
 const CHECKS = [
   { label: 'NBER Working Papers', run: () => fetch('https://www.nber.org/rss/new.xml', { headers: { 'user-agent': 'dsh-journal-monitor/0.2' } }).then((r) => ({ ok: r.ok, status: r.status, text: () => r.text() })) },
@@ -36,6 +36,17 @@ const CHECKS = [
       }).then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return parseCnToc(await r.text(), 'https://sjjj.magtech.com.cn/CN/home')
+      }),
+  },
+  {
+    label: '中国农村观察当期目录 (ajcass)',
+    run: () =>
+      fetch('https://zgncgc.ajcass.com/', {
+        signal: AbortSignal.timeout(25000),
+        headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36' },
+      }).then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return parseAjcass(await r.text(), 'https://zgncgc.ajcass.com/')
       }),
   },
 ]

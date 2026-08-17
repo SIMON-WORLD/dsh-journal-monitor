@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseFeed, filterItems, itemId, buildBriefing, ECON_SOURCES, fetchArxivCategory, parseCnToc } from '../src/index.ts'
+import { parseFeed, filterItems, itemId, buildBriefing, ECON_SOURCES, fetchArxivCategory, parseCnToc, parseAjcass } from '../src/index.ts'
 
 const SAMPLE_RSS = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel>
@@ -175,4 +175,41 @@ test('ECON_SOURCES: 含中文经管期刊源 sjjj', () => {
   assert.ok(sjjj, 'should contain sjjj source')
   assert.equal(sjjj.kind, 'cn-toc')
   assert.match(sjjj.label, /世界经济/)
+})
+
+test('parseAjcass: 解析 ajcass 平台当期目录（标题+作者+卷期）', () => {
+  const html = `<html><body><div id="IssueList">
+    <p class="green"><a href="/Magazine/Show?id=123173">农村集体经营性建设用地入市的困境与出路</a><span>作者:陶然 余家林</span></p>
+    <p class="hod pop">2026 NO.4 <a href="/Magazine/Show?id=123173">[摘要]</a>(343)<a href="/Magazine/Show?id=123173">[PDF]</a></p>
+    <p class="green"><a href="/Magazine/Show?id=123172">乡村振兴中的分配型协商与村庄公共性重塑</a><span>作者:张三</span></p>
+    <p class="hod pop">2026 NO.4 <a href="/Magazine/Show?id=123172">[摘要]</a>(200)<a href="/Magazine/Show?id=123172">[PDF]</a></p>
+  </div></body></html>`
+  const items = parseAjcass(html, 'https://zgncgc.ajcass.com/')
+  assert.equal(items.length, 2)
+  assert.equal(items[0].title, '农村集体经营性建设用地入市的困境与出路')
+  assert.match(items[0].authors, /陶然/)
+  assert.match(items[0].date, /2026 NO\.4/)
+  assert.match(items[0].link, /Magazine\/Show\?id=123173/)
+})
+
+test('parseAjcass: 排除 [摘要]/[PDF] 操作链接（去重后唯一）', () => {
+  const html = `<html><body><div id="IssueList">
+    <p class="green"><a href="/Magazine/Show?id=123173">农村集体经营性建设用地入市的困境与出路</a><span>作者:陶然 余家林</span></p>
+    <p class="hod pop">2026 NO.4 <a href="/Magazine/Show?id=123173">[摘要]</a>(343)<a href="/Magazine/Show?id=123173">[PDF]</a></p>
+  </div></body></html>`
+  const items = parseAjcass(html, 'https://zgncgc.ajcass.com/')
+  assert.equal(items.length, 1, 'should only keep the article, not [摘要]/[PDF] links')
+  assert.equal(items[0].title, '农村集体经营性建设用地入市的困境与出路')
+})
+
+test('parseAjcass: 空输入返回空数组', () => {
+  assert.equal(parseAjcass('', 'https://x/').length, 0)
+  assert.equal(parseAjcass('<html><a href="/a">首页</a></html>', 'https://x/').length, 0)
+})
+
+test('ECON_SOURCES: 含 ajcass 平台源 zgncgc', () => {
+  const z = ECON_SOURCES.find((s) => s.id === 'zgncgc')
+  assert.ok(z, 'should contain zgncgc source')
+  assert.equal(z.kind, 'ajcass')
+  assert.match(z.label, /中国农村观察/)
 })
