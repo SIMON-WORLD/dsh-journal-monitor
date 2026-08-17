@@ -25,5 +25,7 @@ jobs:
         run: npm run build
       - name: Unit tests
         run: npm test
-      - name: Live feed probe (NBER + arXiv econ)
+      - name: Plugin tree load probe (real dsh-tools API)
+        run: node scripts/probe-embed.mjs
+      - name: Live feed probe (NBER + arXiv econ + CN journal)
         run: node scripts/verify-live.mjs
